@@ -1,8 +1,8 @@
 import streamlit as st
 from docx import Document
 from docxcompose.composer import Composer
+from docx.enum.text import WD_BREAK
 from tempfile import NamedTemporaryFile
-import io
 import os
 
 st.set_page_config(
@@ -12,7 +12,9 @@ st.set_page_config(
 )
 
 st.title("📄 DOCX Merger")
-st.write("Upload Word documents, arrange their order, and merge them into a single DOCX.")
+st.write(
+    "Upload Word documents, choose their order, and merge them into a single DOCX."
+)
 
 uploaded_files = st.file_uploader(
     "Upload DOCX files",
@@ -22,24 +24,28 @@ uploaded_files = st.file_uploader(
 
 if uploaded_files:
 
-    st.subheader("Merge Order")
+    st.subheader("Document Order")
 
-    file_names = [f.name for f in uploaded_files]
+    filenames = [f.name for f in uploaded_files]
 
     order = []
+    remaining = filenames.copy()
 
-    available = file_names.copy()
-
-    for i in range(len(file_names)):
+    for i in range(len(filenames)):
         selected = st.selectbox(
             f"Position {i + 1}",
-            available,
-            key=f"pos_{i}"
+            remaining,
+            key=f"order_{i}"
         )
         order.append(selected)
-        available.remove(selected)
+        remaining.remove(selected)
+
+    st.divider()
 
     if st.button("Merge Documents", type="primary"):
+
+        temp_paths = []
+        output_path = None
 
         try:
 
@@ -51,55 +57,76 @@ if uploaded_files:
                         ordered_files.append(uploaded)
                         break
 
-            temp_paths = []
+            # Save uploaded files temporarily
+            for uploaded in ordered_files:
 
-            try:
-
-                for uploaded in ordered_files:
-                    tmp = NamedTemporaryFile(
-                        delete=False,
-                        suffix=".docx"
-                    )
-
-                    tmp.write(uploaded.getbuffer())
-                    tmp.close()
-
-                    temp_paths.append(tmp.name)
-
-                master_doc = Document(temp_paths[0])
-                composer = Composer(master_doc)
-
-                for path in temp_paths[1:]:
-                    composer.append(Document(path))
-
-                output_path = NamedTemporaryFile(
+                tmp = NamedTemporaryFile(
                     delete=False,
                     suffix=".docx"
-                ).name
-
-                composer.save(output_path)
-
-                with open(output_path, "rb") as f:
-                    merged_bytes = f.read()
-
-                st.success("Merge completed successfully!")
-
-                st.download_button(
-                    label="⬇ Download Merged DOCX",
-                    data=merged_bytes,
-                    file_name="merged_document.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
 
-            finally:
+                tmp.write(uploaded.getbuffer())
+                tmp.close()
 
-                for path in temp_paths:
-                    if os.path.exists(path):
-                        os.remove(path)
+                temp_paths.append(tmp.name)
 
-                if 'output_path' in locals():
-                    if os.path.exists(output_path):
-                        os.remove(output_path)
+            if len(temp_paths) == 0:
+                st.error("No files selected.")
+                st.stop()
+
+            # First document becomes master
+            master_doc = Document(temp_paths[0])
+            composer = Composer(master_doc)
+
+            # Append remaining docs with page breaks
+            for path in temp_paths[1:]:
+
+                # Force next document onto a fresh page
+                paragraph = master_doc.add_paragraph()
+                run = paragraph.add_run()
+                run.add_break(WD_BREAK.PAGE)
+
+                composer.append(Document(path))
+
+            # Save merged file
+            output_file = NamedTemporaryFile(
+                delete=False,
+                suffix=".docx"
+            )
+
+            output_path = output_file.name
+            output_file.close()
+
+            composer.save(output_path)
+
+            with open(output_path, "rb") as f:
+                merged_bytes = f.read()
+
+            st.success("Documents merged successfully!")
+
+            st.download_button(
+                label="⬇ Download Merged DOCX",
+                data=merged_bytes,
+                file_name="merged_document.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
 
         except Exception as e:
-            st.error(f"Merge failed: {e}")
+
+            st.error(f"Merge failed: {str(e)}")
+
+        finally:
+
+            for path in temp_paths:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                except Exception:
+                    pass
+
+            if output_path:
+                try:
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
+                except Exception:
+                    pass
