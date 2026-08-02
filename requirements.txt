@@ -2,3 +2,6 @@ streamlit
 python-docx
 docxcompose
 lxml
+pypdf
+pymupdf
+pdf2docx
