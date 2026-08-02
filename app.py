@@ -1,5 +1,3 @@
-"""
-DOCX Merger / Page Editor
 =========================
 
 Dependencies (pip install --break-system-packages ...):
