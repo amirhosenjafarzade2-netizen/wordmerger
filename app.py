@@ -248,6 +248,28 @@ if not soffice_path:
         "with `sudo apt-get install libreoffice` (Linux) or "
         "`brew install --cask libreoffice` (macOS), then restart the app."
     )
+    with st.expander("Diagnostic info (useful for Streamlit Community Cloud / Docker debugging)"):
+        st.code(
+            f"shutil.which('soffice')     = {shutil.which('soffice')}\n"
+            f"shutil.which('libreoffice') = {shutil.which('libreoffice')}\n"
+            f"PATH = {os.environ.get('PATH')}\n"
+            f"Checked common install paths:\n"
+            + "\n".join(
+                f"  {p} -> exists: {os.path.exists(p)}"
+                for p in [
+                    "/usr/bin/soffice",
+                    "/usr/bin/libreoffice",
+                    "/opt/libreoffice*/program/soffice",
+                    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+                ]
+            ),
+            language="text",
+        )
+        st.caption(
+            "If this shows `None` even after adding a packages.txt with "
+            "`libreoffice` and rebooting the app, check the deployment build "
+            "logs for apt-get errors (disk quota, timeout, etc.)."
+        )
 
 mode = st.radio(
     "Choose a mode",
